@@ -3,6 +3,9 @@ const { Cluster } = require("puppeteer-cluster");
 const { performance } = require("perf_hooks");
 const $ = require("cheerio");
 const readline = require("readline");
+const csv = require("fast-csv");
+const nodemailer = require('nodemailer');
+const MapCategories = require('./mapCategories');
 
 const posts = [];
 
@@ -33,67 +36,6 @@ const processListing = async (page, url) => {
 		category_mapped: "",
 		price: price.text(),
 		url: url,
-	});
-};
-
-const mapCategories = () => {
-	posts.map((post) => {
-		switch (post.category) {
-			case "Beds":
-				post.category_mapped = "beds";
-				break;
-			case "Sofas":
-				post.category_mapped = "sofas";
-				break;
-			case "Dining Tables":
-				post.category_mapped = "dining tables";
-				break;
-			case "Other Furniture":
-				post.category_mapped = "similar items";
-				break;
-			case "Coffee Tables":
-				post.category_mapped = "coffee tables";
-				break;
-			case "Cabinets":
-				post.category_mapped = "cabinets";
-				break;
-			case "Desks":
-				post.category_mapped = "desks";
-				break;
-			case "Entertainment & TV Units":
-				post.category_mapped = "TV Units";
-				break;
-			case "Dining Chairs":
-				post.category_mapped = "dining chairs";
-				break;
-			case "Bookcases & Shelves":
-				post.category_mapped = "bookcases & shelves";
-				break;
-			case "Armchairs":
-				post.category_mapped = "armchairs";
-				break;
-			case "Dresses & Drawers":
-				post.category_mapped = "dressers & drawers";
-				break;
-			case "Buffets & Side Tables":
-				post.category_mapped = "buffets & side tables";
-				break;
-			case "Stools & Bar stools":
-				post.category_mapped = "stools & bar stools";
-				break;
-			case "Mirrors":
-				post.category_mapped = "mirrors";
-				break;
-			case "Bedside Tables":
-				post.category_mapped = "bedside tables";
-				break;
-			case "Office Chairs":
-				post.category_mapped = "office chairs";
-				break;
-			case "Wardrobes":
-				post.category_mapped = "wardrobes";
-				break;
-		}
 	});
 };
 
@@ -168,7 +110,7 @@ const startSmall = async (cluster) => {
 
 	//map categories
 	console.log("🚀   Mapping category names");
-	mapCategories();
+	MapCategories.mapCategories(posts);
 
 	await browser.close();
 	const t1 = performance.now();
@@ -176,7 +118,59 @@ const startSmall = async (cluster) => {
 	console.log("Use view command to view scraped data");
 };
 
-const extractData = async () => {
+const extractData = () => {
+  if(posts.length === 0) {
+    console.log("Empty. Scrape data first, '?' for more commands");
+    recursiveAsyncReadLine();
+  } else {
+      recursiveAsyncReadEmail();
+  }
+}
+
+const recursiveAsyncReadEmail = () => {
+  rl.question("Which email do you want to send it to?\n", (input) => {
+
+    if(input !== '') {
+        const stream = csv.write(posts, { headers: true });
+        const transporter = nodemailer.createTransport({
+          service: 'hotmail',
+          auth: {
+            user: 'notabot419@outlook.com',
+            pass: 'imabot1!'
+          }
+        });
+        
+        const mailOptions = {
+          from: 'notabot419@outlook.com',
+          to: input,
+          subject: 'Sending data using Node.js',
+          text: 'Going to the moon! 🚀',
+          attachments: [
+            {
+              filename: 'raw.csv',
+              content: stream
+            }
+          ]
+        };
+        
+        transporter.sendMail(mailOptions, function(error, info){
+          if (error) {
+            console.log("==================================================================================");
+            console.log("🚀              Error sending email, try different address                       🚀");
+            console.log("==================================================================================");
+            recursiveAsyncReadEmail();
+          } else {
+            console.log('Email sent to :' + input);
+            console.log("==================================================================================");
+            console.log("🚀                    Successfully extracted and sent raw.csv                    🚀");
+            console.log("==================================================================================");
+            recursiveAsyncReadLine();
+          }
+        });         
+    } else {
+      recursiveAsyncReadEmail();
+    }
+  });
 
 }
 
@@ -209,7 +203,7 @@ const recursiveAsyncReadLine = () => {
 			});
 		} else if (cmd === "start_small_cluster") {
 			console.log("==================================================================================");
-			console.log("🚀                starting small instance w/ cluster ~ 30 links                🚀");
+			console.log("🚀                 starting small instance w/ cluster ~ 30 links                 🚀");
 			console.log("==================================================================================");
 			startSmall(true).then(() => {
 				recursiveAsyncReadLine();
@@ -218,9 +212,7 @@ const recursiveAsyncReadLine = () => {
 			console.log("==================================================================================");
 			console.log("🚀                            extract data and email                             🚀");
 			console.log("==================================================================================");
-			extractData().then(() => {
-				recursiveAsyncReadLine();
-			});
+			extractData();
 		} else if (cmd === "view") {
 			console.log("==================================================================================");
 			console.log("🚀                            starting view command                              🚀");
