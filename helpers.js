@@ -39,10 +39,32 @@ const processListing = async (page, url) => {
 	});
 };
 
-const startSmall = async (cluster) => {
+const scrapeLinks = async(listings, page, url) => {
+
+	console.log("🚀   Navigating to gumtree with search restrictions   ");
+	const searchResp = await page.goto(url, { waitUntil: "domcontentloaded" });
+
+  if(!searchResp) {
+    return false;
+  }
+
+  const body = await searchResp.text();
+
+  console.log("🚀   Scraping links   ");
+    
+  const result = $(".user-ad-row-new-design", body);
+  for (let i = 0; i < result.length; i++) {
+    listings.push(`https://www.gumtree.com.au${result[i].attribs.href}`);
+  }
+  console.log(`🚀   Scraped ${listings.length} links   `);
+
+  console.log("🚀   Scraping data from individual links   ");
+}
+
+const startScrape = async (cluster, mode) => {
 	const listings = [];
 	const t0 = performance.now();
-	const browser = await puppeteer.launch({ headless: true });
+	const browser = await puppeteer.launch({ headless: false });
 
 	const [page] = await browser.pages();
 
@@ -72,20 +94,96 @@ const startSmall = async (cluster) => {
       ]);
       console.log('🚀   Logged In to gumtree as Moleno   🚀');*/
 
-	console.log("🚀   Navigating to gumtree with search restrictions   ");
-	const searchResp = await page.goto("https://www.gumtree.com.au/s-furniture/waterloo-sydney/furniture/k0c20073l3003798r10?ad=offering", { waitUntil: "domcontentloaded" });
 
-	console.log("🚀   Scraping links   ");
-	const body = await searchResp.text();
-	const result = $(".user-ad-row-new-design", body);
-	for (let i = 0; i < result.length; i++) {
-		listings.push(`https://www.gumtree.com.au${result[i].attribs.href}`);
-	}
-	console.log(`🚀   Scraped ${listings.length} links   `);
+  if(mode === 'small') {
 
-	console.log("🚀   Scraping data from individual links   ");
+    await scrapeLinks(listings, page, "https://www.gumtree.com.au/s-furniture/waterloo-sydney/c20073l3003798r10?ad=offering");
 
-	if (cluster === true) {
+  }
+
+  if(mode === 'today') {
+    //url is https://www.gumtree.com.au/s-furniture/waterloo-sydney/page-10/c20073l3003798r10?ad=offering
+
+    for(let i = 2; i < 10; i++) {
+      await scrapeLinks(listings, page, `https://www.gumtree.com.au/s-furniture/waterloo-sydney/page-${i}/c20073l3003798r10?ad=offering`);
+    }
+    
+    console.log(listings);
+
+
+    //press button for more search results
+
+  /*await page.evaluate(() => {
+    document.querySelector('select:not([id]) > option:nth-child(3)').selected = true;
+    const element = document.querySelector('select:not([id])');
+    console.log(element);
+    var event = new Event('change', { bubbles: true });
+    event.simulated=true;
+    element.dispatchEvent(event);
+});*/
+    //const selectSrc = await page.$eval('img', el => el.getAttribute('src'));
+    //await page.waitForSelector('.select--clear > select');
+    //await page.click('.select--clear > select');
+    //await page.waitForSelector('select:not([id]) > option:nth-child(3)');
+    //await page.click('select:not([id]) > option:nth-child(3)');
+    /*let finishedToday = false;
+
+    const recursivePageLoop = async (body, page) => {
+      const result = $(".user-ad-row-new-design", body);
+      const times = $(".user-ad-row-new-design__age", body);
+
+      for (let i = 0; i < result.length; i++) {
+        listings.push(`https://www.gumtree.com.au${result[i].attribs.href}`);
+        if(!result[i].attribs['aria-describedby'].includes("TOP")) {
+          console.log(result[i].attribs.href);
+          if(!times[i].children[0].data.includes("ago")) {
+            finishedToday = true;
+            return;
+          }
+        }
+      }
+
+      //at the end of each listing, load next page
+      //loop until date posted is no longer '_ hours ago'
+      const urlSrc = $('.page-number-navigation > .link--no-underline:nth-last-child(2)', body);
+      const url = urlSrc[0].attribs.href;
+      console.log(url);
+      const nextResp = await page.goto(url, { waitUntil: "domcontentloaded" });
+      const nextBody = await nextResp.text();
+      recursivePageLoop(nextBody, page);
+    }
+
+    await recursivePageLoop(body, page);*/
+    //while(finishedToday !== true) {
+      //user-ad-row-new-design__age
+      /*const result = $(".user-ad-row-new-design", body);
+      const times = $(".user-ad-row-new-design__age", body);
+
+      for (let i = 0; i < result.length; i++) {
+        listings.push(`https://www.gumtree.com.au${result[i].attribs.href}`);
+        if(!result[i].attribs['aria-describedby'].includes("TOP")) {
+          console.log(result[i].attribs.href);
+          if(!times[i].children[0].data.includes("ago")) {
+            finishedToday = true;
+            break;
+          }
+        }
+      }
+
+      //at the end of each listing, load next page
+      //loop until date posted is no longer '_ hours ago'
+      const urlSrc = $('.page-number-navigation > .link--no-underline:nth-child(11)', body);
+      const url = urlSrc[0].attribs.href;
+      console.log(url);
+      await page.goto(url, { waitUntil: "domcontentloaded" });*/
+    //}
+      console.log(`🚀   Scraped ${listings.length} links   `);
+    
+      console.log("🚀   Scraping data from individual links   ");
+  }
+	
+
+	/*if (cluster === true) {
 		console.log("🚀   Starting with max concurrency 3   ");
 		const cluster = await Cluster.launch({
 			concurrency: Cluster.CONCURRENCY_CONTEXT,
@@ -106,7 +204,7 @@ const startSmall = async (cluster) => {
 		for (let i = 0; i < listings.length; i++) {
 			await processListing(page, listings[i]);
 		}
-	}
+	}*/
 
 	//map categories
 	console.log("🚀   Mapping category names");
@@ -143,7 +241,7 @@ const recursiveAsyncReadEmail = () => {
         const mailOptions = {
           from: 'notabot419@outlook.com',
           to: input,
-          subject: 'Sending data using Node.js',
+          subject: 'Data scraped using gum scraper',
           text: 'Going to the moon! 🚀',
           attachments: [
             {
@@ -197,18 +295,32 @@ const recursiveAsyncReadLine = () => {
 			console.log("==================================================================================");
 			console.log("🚀                      starting small instance ~ 30 links                       🚀");
 			console.log("==================================================================================");
-
-			startSmall(false).then(() => {
+      const cluster = false;
+      const mode = 'small';
+			startScrape(cluster, mode).then(() => {
 				recursiveAsyncReadLine();
 			});
 		} else if (cmd === "start_small_cluster") {
 			console.log("==================================================================================");
 			console.log("🚀                 starting small instance w/ cluster ~ 30 links                 🚀");
 			console.log("==================================================================================");
-			startSmall(true).then(() => {
+			const cluster = true;
+      const mode = 'small';
+      startScrape(cluster, mode).then(() => {
 				recursiveAsyncReadLine();
 			});
-		}  else if (cmd === "extract") {
+		} else if (cmd === "start_today") {
+			console.log("==================================================================================");
+			console.log("🚀                            starting today instance                            🚀");
+			console.log("==================================================================================");
+			const cluster = true;
+      const mode = 'today';
+      startScrape(cluster, mode).then(() => {
+				recursiveAsyncReadLine();
+			});
+		}
+    
+    else if (cmd === "extract") {
 			console.log("==================================================================================");
 			console.log("🚀                            extract data and email                             🚀");
 			console.log("==================================================================================");
