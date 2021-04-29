@@ -1,0 +1,25 @@
+//for logging in to gumtree
+//pass webdriver test to hide that were bot
+/*await page.evaluateOnNewDocument(() => {
+      Object.defineProperty(navigator, 'webdriver',recursiveAsyncReadLine(); {
+          get: () => false
+      });
+  });
+
+  console.log('🚀   Navigating to gumtree login   🚀');
+  const loginResp = await page.goto('https://www.gumtree.com.au/t-login-form.html', {waitUntil: 'domcontentloaded'});
+  
+  console.log('🚀   Entering email   🚀');
+  await page.waitForSelector('#login-email');
+  await page.type('#login-email', 'moleno6930@zevars.com');
+
+  console.log('🚀   Entering password   🚀');
+  await page.type('#login-password', 'moleno111!');
+
+  console.log('🚀   Logging in   🚀');
+
+  await Promise.all([
+      page.click('#btn-submit-login'),
+      page.waitForNavigation(),
+  ]);
+  console.log('🚀   Logged In to gumtree as Moleno   🚀');*/

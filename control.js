@@ -71,32 +71,17 @@ const recursiveAsyncReadLine = () => {
 			recursiveAsyncReadLine();
 		} else if (cmd === 'start_small') {
 			print.startingSmall();
-			scrape.startScrape(false, 'small', posts).then(() => {
-				recursiveAsyncReadLine();
-			});
-		} else if (cmd === 'start_small_cluster') {
-			print.startingSmallCluster();
-			scrape.startScrape(true, 'small', posts).then(() => {
+			scrape.startScrape('small', posts).then(() => {
 				recursiveAsyncReadLine();
 			});
 		} else if (cmd === 'start_full') {
 			print.startingFull();
-			scrape.startScrape(false, 'full', posts).then(() => {
-				recursiveAsyncReadLine();
-			});
-		} else if (cmd === 'start_full_cluster') {
-			print.startingFullCluster();
-			scrape.startScrape(true, 'full', posts).then(() => {
+			scrape.startScrape('full', posts).then(() => {
 				recursiveAsyncReadLine();
 			});
 		} else if (cmd === 'start_today') {
 			print.startingToday();
-			scrape.startScrape(false, 'today', posts).then(() => {
-				recursiveAsyncReadLine();
-			});
-		} else if (cmd === 'start_today_cluster') {
-			print.startingTodayCluster();
-			scrape.startScrape(true, 'today', posts).then(() => {
+			scrape.startScrape('today', posts).then(() => {
 				recursiveAsyncReadLine();
 			});
 		} else if (cmd === 'extract') {
@@ -108,7 +93,6 @@ const recursiveAsyncReadLine = () => {
 			if (posts.length === 0) {
 				console.log('🚀  Scrape data first to populate table');
 			}
-
 			recursiveAsyncReadLine();
 		} else if (cmd === 'reset') {
 			if (posts.length === 0) {
@@ -118,12 +102,7 @@ const recursiveAsyncReadLine = () => {
 				posts.length = 0;
 			}
 			recursiveAsyncReadLine();
-		}  else if (cmd === 'start_test') {
-			print.startingTest();
-			scrape.startScrape(false, 'test', posts).then(() => {
-				recursiveAsyncReadLine();
-			});
-		} else {
+		}  else {
 			console.log(`🚀                      🚀 Unknown command, '?' for help 🚀                      🚀`);
 			recursiveAsyncReadLine();
 		}

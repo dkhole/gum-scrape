@@ -13,7 +13,6 @@ module.exports = {
 		console.log('🚀        start_small                starts a small instance (30 links)           🚀');
 		console.log('🚀        start_today                starts a scrape of all listings posted today 🚀');
 		console.log('🚀        start_full                 starts a full scrape                         🚀');
-		console.log('🚀        start_*_cluster            starts * (small, today or full) w/ cluster   🚀');
 		//console.log('🚀   login                           logs in to gumtree with given credentials   🚀');
 		console.log('🚀        extract                    extracts data to csv and sends to email      🚀');
 		console.log('🚀        view                       displays extracted data in table form        🚀');
@@ -28,33 +27,15 @@ module.exports = {
 		console.log('==================================================================================');
 	},
 
-	startingSmallCluster: () => {
-		console.log('==================================================================================');
-		console.log('🚀                 starting small instance w/ cluster ~ 30 links                 🚀');
-		console.log('==================================================================================');
-	},
-
 	startingFull: () => {
 		console.log('==================================================================================');
 		console.log('🚀                            starting full instance                             🚀');
 		console.log('==================================================================================');
 	},
 
-	startingFullCluster: () => {
-		console.log('==================================================================================');
-		console.log('🚀                         starting full instance w/ cluster                     🚀');
-		console.log('==================================================================================');
-	},
-
 	startingToday: () => {
 		console.log('==================================================================================');
-		console.log('🚀                            starting today instance                            🚀');
-		console.log('==================================================================================');
-	},
-
-	startingTodayCluster: () => {
-		console.log('==================================================================================');
-		console.log('🚀                       starting today instance w/ cluster                      🚀');
+		console.log('🚀                      starting today instance ~ 800 links                      🚀');
 		console.log('==================================================================================');
 	},
 
