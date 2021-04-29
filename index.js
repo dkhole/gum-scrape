@@ -1,4 +1,5 @@
 const helpers = require('./helpers');
+const print = require('./print');
 
-helpers.displayIntro();
+print.displayIntro();
 helpers.startCommands();

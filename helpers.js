@@ -1,11 +1,12 @@
-const puppeteer = require("puppeteer");
-const { Cluster } = require("puppeteer-cluster");
-const { performance } = require("perf_hooks");
-const $ = require("cheerio");
-const readline = require("readline");
-const csv = require("fast-csv");
+const puppeteer = require('puppeteer');
+const { Cluster } = require('puppeteer-cluster');
+const { performance } = require('perf_hooks');
+const $ = require('cheerio');
+const readline = require('readline');
+const csv = require('fast-csv');
 const nodemailer = require('nodemailer');
 const MapCategories = require('./mapCategories');
+const print = require('./print');
 
 const posts = [];
 
@@ -15,17 +16,17 @@ const rl = readline.createInterface({
 });
 
 const processListing = async (page, url) => {
-	console.log("🚀   Navigating to link");
+	console.log('🚀   Navigating to link');
 	const resps = await page.goto(url, {
 		timeout: 0,
-		waitUntil: "domcontentloaded",
+		waitUntil: 'domcontentloaded',
 	});
 
-	console.log("🚀   Scraping link");
+	console.log('🚀   Scraping link');
 	const bodys = await resps.text();
-	const name = $(".seller-profile__name", bodys);
-	const breadcrumbs = $(".breadcrumbs__separator", bodys);
-	const price = $(".user-ad-price__price", bodys);
+	const name = $('.seller-profile__name', bodys);
+	const breadcrumbs = $('.breadcrumbs__separator', bodys);
+	const price = $('.user-ad-price__price', bodys);
 	const location = breadcrumbs.next();
 	const category = breadcrumbs.last().prev();
 
@@ -33,38 +34,65 @@ const processListing = async (page, url) => {
 		name: name.text(),
 		location: location.text(),
 		category: category.text(),
-		category_mapped: "",
+		category_mapped: '',
 		price: price.text(),
 		url: url,
 	});
 };
 
-const scrapeLinks = async(listings, page, url) => {
+const scrapeLinks = async (listings, page, url, getPages) => {
+	console.log('🚀   Navigating to gumtree with search restrictions   ');
+	const searchResp = await page.goto(url, { waitUntil: 'domcontentloaded' });
+	const body = await searchResp.text();
 
-	console.log("🚀   Navigating to gumtree with search restrictions   ");
-	const searchResp = await page.goto(url, { waitUntil: "domcontentloaded" });
+	console.log('🚀   Scraping links   ');
 
-  if(!searchResp) {
-    return false;
-  }
+	const result = $('.user-ad-row-new-design', body);
 
-  const body = await searchResp.text();
+	for (let i = 0; i < result.length; i++) {
+		listings.push(`https://www.gumtree.com.au${result[i].attribs.href}`);
+	}
+	console.log(`🚀   Scraped ${listings.length} links   `);
 
-  console.log("🚀   Scraping links   ");
-    
-  const result = $(".user-ad-row-new-design", body);
-  for (let i = 0; i < result.length; i++) {
-    listings.push(`https://www.gumtree.com.au${result[i].attribs.href}`);
-  }
-  console.log(`🚀   Scraped ${listings.length} links   `);
+	console.log('🚀   Scraping data from individual links   ');
 
-  console.log("🚀   Scraping data from individual links   ");
-}
+	if (getPages) {
+		const summary = $('.breadcrumbs__summary--enhanced', body).text();
+		const numPages = parseInt(summary.substring(summary.length - 3, summary.length - 1));
+		console.log(`🚀   A total of ${numPages} number of pages to scrape`);
+		return numPages;
+	}
+};
+
+const scrapeLinksToday = async (listings, page, url) => {
+	console.log('🚀   Navigating to gumtree with search restrictions   ');
+	const searchResp = await page.goto(url, { waitUntil: 'domcontentloaded' });
+	const body = await searchResp.text();
+
+	console.log('🚀   Scraping links   ');
+
+	const result = $('.user-ad-row-new-design', body);
+	const times = $('.user-ad-row-new-design__age', body);
+
+	for (let i = 0; i < result.length; i++) {
+		listings.push(`https://www.gumtree.com.au${result[i].attribs.href}`);
+		if (!result[i].attribs['aria-describedby'].includes('TOP')) {
+			if (!times[i].children[0].data.includes('ago')) {
+				console.log(`🚀   Scraped ${listings.length} links   `);
+				console.log('🚀   Scraping data from individual links   ');
+				return false;
+			}
+		}
+	}
+	console.log(`🚀   Scraped ${listings.length} links   `);
+	console.log('🚀   Scraping data from individual links   ');
+	return true;
+};
 
 const startScrape = async (cluster, mode) => {
 	const listings = [];
 	const t0 = performance.now();
-	const browser = await puppeteer.launch({ headless: false });
+	const browser = await puppeteer.launch({ headless: true });
 
 	const [page] = await browser.pages();
 
@@ -94,97 +122,51 @@ const startScrape = async (cluster, mode) => {
       ]);
       console.log('🚀   Logged In to gumtree as Moleno   🚀');*/
 
+	if (mode === 'small') {
+		await scrapeLinks(listings, page, 'https://www.gumtree.com.au/s-furniture/waterloo-sydney/c20073l3003798r10?ad=offering');
+	}
 
-  if(mode === 'small') {
+	if (mode === 'full') {
+		//get first page
+		await scrapeLinks(listings, page, 'https://www.gumtree.com.au/s-furniture/waterloo-sydney/c20073l3003798r10?ad=offering', false);
+		//get second page and number of pages
+		const numPages = await scrapeLinks(
+			listings,
+			page,
+			'https://www.gumtree.com.au/s-furniture/waterloo-sydney/page-2/c20073l3003798r10?ad=offering',
+			true
+		);
+		//loop through from third page until end of pages
+		for (let i = 3; i < numPages + 1; i++) {
+			await scrapeLinks(listings, page, `https://www.gumtree.com.au/s-furniture/waterloo-sydney/page-${i}/c20073l3003798r10?ad=offering`, false);
+		}
 
-    await scrapeLinks(listings, page, "https://www.gumtree.com.au/s-furniture/waterloo-sydney/c20073l3003798r10?ad=offering");
+		console.log(listings);
+	}
 
-  }
+	if (mode === 'today') {
+		//get first page
+		await scrapeLinks(listings, page, 'https://www.gumtree.com.au/s-furniture/waterloo-sydney/c20073l3003798r10?ad=offering', false);
 
-  if(mode === 'today') {
-    //url is https://www.gumtree.com.au/s-furniture/waterloo-sydney/page-10/c20073l3003798r10?ad=offering
+		let isToday = true;
+		let i = 2;
 
-    for(let i = 2; i < 10; i++) {
-      await scrapeLinks(listings, page, `https://www.gumtree.com.au/s-furniture/waterloo-sydney/page-${i}/c20073l3003798r10?ad=offering`);
-    }
-    
-    console.log(listings);
+		while (isToday) {
+			isToday = await scrapeLinksToday(
+				listings,
+				page,
+				`https://www.gumtree.com.au/s-furniture/waterloo-sydney/page-${i}/c20073l3003798r10?ad=offering`
+			);
+			i++;
+		}
 
+		console.log(`🚀   Scraped ${listings.length} links   `);
 
-    //press button for more search results
+		console.log('🚀   Scraping data from individual links   ');
+	}
 
-  /*await page.evaluate(() => {
-    document.querySelector('select:not([id]) > option:nth-child(3)').selected = true;
-    const element = document.querySelector('select:not([id])');
-    console.log(element);
-    var event = new Event('change', { bubbles: true });
-    event.simulated=true;
-    element.dispatchEvent(event);
-});*/
-    //const selectSrc = await page.$eval('img', el => el.getAttribute('src'));
-    //await page.waitForSelector('.select--clear > select');
-    //await page.click('.select--clear > select');
-    //await page.waitForSelector('select:not([id]) > option:nth-child(3)');
-    //await page.click('select:not([id]) > option:nth-child(3)');
-    /*let finishedToday = false;
-
-    const recursivePageLoop = async (body, page) => {
-      const result = $(".user-ad-row-new-design", body);
-      const times = $(".user-ad-row-new-design__age", body);
-
-      for (let i = 0; i < result.length; i++) {
-        listings.push(`https://www.gumtree.com.au${result[i].attribs.href}`);
-        if(!result[i].attribs['aria-describedby'].includes("TOP")) {
-          console.log(result[i].attribs.href);
-          if(!times[i].children[0].data.includes("ago")) {
-            finishedToday = true;
-            return;
-          }
-        }
-      }
-
-      //at the end of each listing, load next page
-      //loop until date posted is no longer '_ hours ago'
-      const urlSrc = $('.page-number-navigation > .link--no-underline:nth-last-child(2)', body);
-      const url = urlSrc[0].attribs.href;
-      console.log(url);
-      const nextResp = await page.goto(url, { waitUntil: "domcontentloaded" });
-      const nextBody = await nextResp.text();
-      recursivePageLoop(nextBody, page);
-    }
-
-    await recursivePageLoop(body, page);*/
-    //while(finishedToday !== true) {
-      //user-ad-row-new-design__age
-      /*const result = $(".user-ad-row-new-design", body);
-      const times = $(".user-ad-row-new-design__age", body);
-
-      for (let i = 0; i < result.length; i++) {
-        listings.push(`https://www.gumtree.com.au${result[i].attribs.href}`);
-        if(!result[i].attribs['aria-describedby'].includes("TOP")) {
-          console.log(result[i].attribs.href);
-          if(!times[i].children[0].data.includes("ago")) {
-            finishedToday = true;
-            break;
-          }
-        }
-      }
-
-      //at the end of each listing, load next page
-      //loop until date posted is no longer '_ hours ago'
-      const urlSrc = $('.page-number-navigation > .link--no-underline:nth-child(11)', body);
-      const url = urlSrc[0].attribs.href;
-      console.log(url);
-      await page.goto(url, { waitUntil: "domcontentloaded" });*/
-    //}
-      console.log(`🚀   Scraped ${listings.length} links   `);
-    
-      console.log("🚀   Scraping data from individual links   ");
-  }
-	
-
-	/*if (cluster === true) {
-		console.log("🚀   Starting with max concurrency 3   ");
+	if (cluster === true) {
+		console.log('🚀   Starting with max concurrency 3   ');
 		const cluster = await Cluster.launch({
 			concurrency: Cluster.CONCURRENCY_CONTEXT,
 			maxConcurrency: 3,
@@ -204,147 +186,136 @@ const startScrape = async (cluster, mode) => {
 		for (let i = 0; i < listings.length; i++) {
 			await processListing(page, listings[i]);
 		}
-	}*/
+	}
 
 	//map categories
-	console.log("🚀   Mapping category names");
+	console.log('🚀   Mapping category names');
 	MapCategories.mapCategories(posts);
 
 	await browser.close();
 	const t1 = performance.now();
-	console.log("small scrape took " + (t1 - t0) + " milliseconds.");
-	console.log("Use view command to view scraped data");
+	console.log('small scrape took ' + (t1 - t0) + ' milliseconds.');
+	console.log('Use view command to view scraped data');
 };
 
 const extractData = () => {
-  if(posts.length === 0) {
-    console.log("Empty. Scrape data first, '?' for more commands");
-    recursiveAsyncReadLine();
-  } else {
-      recursiveAsyncReadEmail();
-  }
-}
+	if (posts.length === 0) {
+		console.log("Empty. Scrape data first, '?' for more commands");
+		recursiveAsyncReadLine();
+	} else {
+		recursiveAsyncReadEmail();
+	}
+};
 
 const recursiveAsyncReadEmail = () => {
-  rl.question("Which email do you want to send it to?\n", (input) => {
+	rl.question('Which email do you want to send it to?\n', (input) => {
+		if (input !== '') {
+			const stream = csv.write(posts, { headers: true });
+			const transporter = nodemailer.createTransport({
+				service: 'hotmail',
+				auth: {
+					user: 'notabot419@outlook.com',
+					pass: 'imabot1!',
+				},
+			});
 
-    if(input !== '') {
-        const stream = csv.write(posts, { headers: true });
-        const transporter = nodemailer.createTransport({
-          service: 'hotmail',
-          auth: {
-            user: 'notabot419@outlook.com',
-            pass: 'imabot1!'
-          }
-        });
-        
-        const mailOptions = {
-          from: 'notabot419@outlook.com',
-          to: input,
-          subject: 'Data scraped using gum scraper',
-          text: 'Going to the moon! 🚀',
-          attachments: [
-            {
-              filename: 'raw.csv',
-              content: stream
-            }
-          ]
-        };
-        
-        transporter.sendMail(mailOptions, function(error, info){
-          if (error) {
-            console.log("==================================================================================");
-            console.log("🚀              Error sending email, try different address                       🚀");
-            console.log("==================================================================================");
-            recursiveAsyncReadEmail();
-          } else {
-            console.log('Email sent to :' + input);
-            console.log("==================================================================================");
-            console.log("🚀                    Successfully extracted and sent raw.csv                    🚀");
-            console.log("==================================================================================");
-            recursiveAsyncReadLine();
-          }
-        });         
-    } else {
-      recursiveAsyncReadEmail();
-    }
-  });
+			const mailOptions = {
+				from: 'notabot419@outlook.com',
+				to: input,
+				subject: 'Data scraped using gum scraper',
+				text: 'Going to the moon! 🚀',
+				attachments: [
+					{
+						filename: 'raw.csv',
+						content: stream,
+					},
+				],
+			};
 
-}
+			transporter.sendMail(mailOptions, function (error, info) {
+				if (error) {
+					print.errorEmail();
+					recursiveAsyncReadEmail();
+				} else {
+					console.log('Email sent to :' + input);
+					print.successExtract();
+					recursiveAsyncReadLine();
+				}
+			});
+		} else {
+			recursiveAsyncReadEmail();
+		}
+	});
+};
 
 const recursiveAsyncReadLine = () => {
-	rl.question("🚀                            🚀  Enter Command  🚀                              🚀\n~~ ", (cmd) => {
-		if (cmd === "exit")
+	rl.question('🚀                            🚀  Enter Command  🚀                              🚀\n~~ ', (cmd) => {
+		if (cmd === 'exit')
 			//base case for recursion
 			return rl.close();
 		//closing RL and returning from function.
-		else if (cmd === "?") {
-			console.log("🚀                         🚀 List  Of  Commands 🚀                              🚀");
-			console.log("==================================================================================");
-			console.log("🚀        start_small                starts a small instance (30 links)          🚀");
-			console.log("🚀        start_small_cluster        starts a small instance w/ cluster          🚀");
-			console.log("🚀        start_full                 starts a full scrape                        🚀");
-			//console.log('🚀   login                           logs in to gumtree with given credentials   🚀');
-			console.log("🚀        extract                    extracts data to csv and sends to email     🚀");
-			console.log("🚀        view                       displays extracted data in table form       🚀");
-			console.log("🚀        reset                      deletes current data                        🚀");
-			console.log("🚀        ?                          lists all the commands                      🚀");
-			console.log("🚀        exit                       shutsdown program                           🚀\n");
+		else if (cmd === '?') {
+			print.help();
 			recursiveAsyncReadLine();
-		} else if (cmd === "start_small") {
-			console.log("==================================================================================");
-			console.log("🚀                      starting small instance ~ 30 links                       🚀");
-			console.log("==================================================================================");
-      const cluster = false;
-      const mode = 'small';
+		} else if (cmd === 'start_small') {
+			print.startingSmall();
+			const cluster = false;
+			const mode = 'small';
 			startScrape(cluster, mode).then(() => {
 				recursiveAsyncReadLine();
 			});
-		} else if (cmd === "start_small_cluster") {
-			console.log("==================================================================================");
-			console.log("🚀                 starting small instance w/ cluster ~ 30 links                 🚀");
-			console.log("==================================================================================");
+		} else if (cmd === 'start_small_cluster') {
+			print.startingSmallCluster();
 			const cluster = true;
-      const mode = 'small';
-      startScrape(cluster, mode).then(() => {
+			const mode = 'small';
+			startScrape(cluster, mode).then(() => {
 				recursiveAsyncReadLine();
 			});
-		} else if (cmd === "start_today") {
-			console.log("==================================================================================");
-			console.log("🚀                            starting today instance                            🚀");
-			console.log("==================================================================================");
-			const cluster = true;
-      const mode = 'today';
-      startScrape(cluster, mode).then(() => {
+		} else if (cmd === 'start_full') {
+			print.startingFull();
+			const cluster = false;
+			const mode = 'full';
+			startScrape(cluster, mode).then(() => {
 				recursiveAsyncReadLine();
 			});
-		}
-    
-    else if (cmd === "extract") {
-			console.log("==================================================================================");
-			console.log("🚀                            extract data and email                             🚀");
-			console.log("==================================================================================");
+		} else if (cmd === 'start_full_cluster') {
+			print.startingFullCluster();
+			const cluster = true;
+			const mode = 'full';
+			startScrape(cluster, mode).then(() => {
+				recursiveAsyncReadLine();
+			});
+		} else if (cmd === 'start_today') {
+			print.startingToday();
+			const cluster = false;
+			const mode = 'today';
+			startScrape(cluster, mode).then(() => {
+				recursiveAsyncReadLine();
+			});
+		} else if (cmd === 'start_today_cluster') {
+			print.startingTodayCluster();
+			const cluster = true;
+			const mode = 'today';
+			startScrape(cluster, mode).then(() => {
+				recursiveAsyncReadLine();
+			});
+		} else if (cmd === 'extract') {
+			print.startingExtract();
 			extractData();
-		} else if (cmd === "view") {
-			console.log("==================================================================================");
-			console.log("🚀                            starting view command                              🚀");
-			console.log("==================================================================================");
+		} else if (cmd === 'view') {
+			print.startingView();
 			console.table(posts);
 
 			if (posts.length === 0) {
-				console.log("🚀  Scrape data first to populate table");
+				console.log('🚀  Scrape data first to populate table');
 			}
 
 			recursiveAsyncReadLine();
-		} else if (cmd === "reset") {
+		} else if (cmd === 'reset') {
 			if (posts.length === 0) {
-				console.log("==================================================================================");
-				console.log("🚀                        Nothing to delete, scrape data first                   🚀");
-				console.log("==================================================================================");
+				print.noToDelete();
 			} else {
-				console.log("==================================================================================");
-				console.log("🚀                         deleted current instance of data                      🚀");
-				console.log("==================================================================================");
+				print.deleted();
 				posts.length = 0;
 			}
 			recursiveAsyncReadLine();
@@ -356,14 +327,6 @@ const recursiveAsyncReadLine = () => {
 };
 
 module.exports = {
-	displayIntro: () => {
-		console.log("==================================================================================");
-		console.log("🚀                    Starting Gum-Scraper for HookItNow                         🚀");
-		console.log("🚀                            We going to the moon 🚀                            🚀");
-		console.log("🚀                  Enter command or '?' for a list of commands                  🚀");
-		console.log("==================================================================================");
-	},
-
 	//80 words in line
 	//recursion in place of while loop
 	startCommands: () => {
