@@ -118,6 +118,11 @@ const recursiveAsyncReadLine = () => {
 				posts.length = 0;
 			}
 			recursiveAsyncReadLine();
+		}  else if (cmd === 'start_test') {
+			print.startingTest();
+			scrape.startScrape(false, 'test', posts).then(() => {
+				recursiveAsyncReadLine();
+			});
 		} else {
 			console.log(`🚀                      🚀 Unknown command, '?' for help 🚀                      🚀`);
 			recursiveAsyncReadLine();

@@ -1,3 +1,4 @@
+const fetch = require('node-fetch');
 const puppeteer = require('puppeteer');
 const { Cluster } = require('puppeteer-cluster');
 const { performance } = require('perf_hooks');
@@ -29,6 +30,26 @@ const processListing = async (page, url, posts) => {
 	});
 };
 
+const processListingTest = async (searchResp, posts) => {
+
+	console.log('🚀   Scraping link');
+	const bodys = await searchResp.text();
+	const name = $('.seller-profile__name', bodys);
+	const breadcrumbs = $('.breadcrumbs__separator', bodys);
+	const price = $('.user-ad-price__price', bodys);
+	const location = breadcrumbs.next();
+	const category = breadcrumbs.last().prev();
+
+	posts.push({
+		name: name.text(),
+		location: location.text(),
+		category: category.text(),
+		category_mapped: '',
+		price: price.text(),
+		url: searchResp.url,
+	});
+};
+
 const scrapeLinks = async (listings, page, url, getPages) => {
 	console.log('🚀   Navigating to gumtree with search restrictions   ');
 	const searchResp = await page.goto(url, { waitUntil: 'domcontentloaded' });
@@ -51,6 +72,23 @@ const scrapeLinks = async (listings, page, url, getPages) => {
 		console.log(`🚀   A total of ${numPages} number of pages to scrape`);
 		return numPages;
 	}
+};
+
+const scrapeLinksTest = async (listings, url) => {
+	console.log('🚀   Navigating to gumtree with search restrictions   ');
+	const searchResp = await fetch(url);
+	const body = await searchResp.text();
+
+	console.log('🚀   Scraping links   ');
+
+	const result = $('.user-ad-row-new-design', body);
+
+	for (let i = 0; i < result.length; i++) {
+		listings.push(`https://www.gumtree.com.au${result[i].attribs.href}`);
+	}
+	console.log(`🚀   Scraped ${listings.length} links   `);
+
+	console.log('🚀   Scraping data from individual links   ');
 };
 
 const scrapeLinksToday = async (listings, page, url) => {
@@ -153,6 +191,30 @@ const startScrape = async (cluster, mode, posts) => {
 
 		console.log(listings);
 	}
+    
+    if(mode === 'test') {
+        await scrapeLinksTest(listings, 'https://www.gumtree.com.au/s-furniture/waterloo-sydney/c20073l3003798r10?ad=offering');
+        //console.log(listings);
+
+        let promises = [];
+        console.log('🚀   Navigating to link');
+        for (let i = 0; i < listings.length; i++) {
+            promises.push(fetch(listings[i]));
+		}
+
+        const results = await Promise.all(promises);
+        promises = [];
+
+        for(let i = 0; i < results.length; i++) {
+            promises.push(processListingTest(results[i], posts));
+        }
+        
+        await Promise.all(promises);
+        MapCategories.mapCategories(posts);
+        const t1 = performance.now();
+        console.log('test scrape took ' + (t1 - t0) + ' milliseconds.');
+        return;
+    }
 
 	if (cluster === true) {
 		console.log('🚀   Starting with max concurrency 3   ');
