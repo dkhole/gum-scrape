@@ -11,9 +11,9 @@ module.exports = {
 		console.log('🚀                             🚀 List  Of  Commands 🚀                           🚀');
 		console.log('==================================================================================');
 		console.log('🚀        start_small                starts a small instance (30 links)           🚀');
-		console.log('🚀        start_small_cluster        starts a small instance w/ cluster           🚀');
-		console.log('🚀        start_full                 starts a full scrape                         🚀');
 		console.log('🚀        start_today                starts a scrape of all listings posted today 🚀');
+		console.log('🚀        start_full                 starts a full scrape                         🚀');
+		console.log('🚀        start_*_cluster            starts * (small, today or full) w/ cluster   🚀');
 		//console.log('🚀   login                           logs in to gumtree with given credentials   🚀');
 		console.log('🚀        extract                    extracts data to csv and sends to email      🚀');
 		console.log('🚀        view                       displays extracted data in table form        🚀');
