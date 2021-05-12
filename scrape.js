@@ -4,12 +4,23 @@ const $ = require('cheerio');
 const MapCategories = require('./mapCategories');
 
 const processListing = async (searchResp, posts) => {
-
 	console.log('🚀   Scraping link');
 	const bodys = await searchResp.text();
 	const name = $('.seller-profile__name', bodys);
 	const breadcrumbs = $('.breadcrumbs__separator', bodys);
 	const price = $('.user-ad-price__price', bodys);
+	const profile = $('.seller-profile', bodys);
+	const profileUrl = `https://www.gumtree.com.au${profile[0].attribs.href}`;
+
+	if (profileUrl === undefined) {
+		console.log(profile);
+		console.log(searchResp.url);
+	}
+	const number = $('.reveal-phone-number', bodys);
+	let hasNumber;
+
+	number.length > 0 ? (hasNumber = true) : (hasNumber = false);
+
 	const location = breadcrumbs.next();
 	const category = breadcrumbs.last().prev();
 
@@ -20,6 +31,8 @@ const processListing = async (searchResp, posts) => {
 		category_mapped: '',
 		price: price.text(),
 		url: searchResp.url,
+		profile_url: profileUrl,
+		has_number: hasNumber,
 	});
 };
 
@@ -88,10 +101,7 @@ const startScrape = async (mode, posts) => {
 		let i = 2;
 
 		while (isToday) {
-			isToday = await scrapeLinksToday(
-				listings,
-				`https://www.gumtree.com.au/s-furniture/waterloo-sydney/page-${i}/c20073l3003798r10?ad=offering`
-			);
+			isToday = await scrapeLinksToday(listings, `https://www.gumtree.com.au/s-furniture/waterloo-sydney/page-${i}/c20073l3003798r10?ad=offering`);
 			i++;
 		}
 
@@ -103,31 +113,28 @@ const startScrape = async (mode, posts) => {
 		//get first page
 		await scrapeLinks(listings, 'https://www.gumtree.com.au/s-furniture/waterloo-sydney/c20073l3003798r10?ad=offering', false);
 		//get second page and number of pages
-		const numPages = await scrapeLinks(
-			listings,
-			'https://www.gumtree.com.au/s-furniture/waterloo-sydney/page-2/c20073l3003798r10?ad=offering',
-			true
-		);
+		const numPages = await scrapeLinks(listings, 'https://www.gumtree.com.au/s-furniture/waterloo-sydney/page-2/c20073l3003798r10?ad=offering', true);
 		//loop through from third page until end of pages
 		for (let i = 3; i < numPages + 1; i++) {
 			await scrapeLinks(listings, `https://www.gumtree.com.au/s-furniture/waterloo-sydney/page-${i}/c20073l3003798r10?ad=offering`, false);
 		}
 	}
 
-    let promises = [];
-    for (let i = 0; i < listings.length; i++) {
-        promises.push(fetch(listings[i]));
-    }
+	let promises = [];
+	for (let i = 0; i < listings.length; i++) {
+		promises.push(fetch(listings[i]));
+	}
 
-    const results = await Promise.all(promises);
-    promises = [];
+	const results = await Promise.all(promises);
 
-    for(let i = 0; i < results.length; i++) {
-        promises.push(processListing(results[i], posts));
-    }
-    
-    
-    await Promise.all(promises);
+	//reuse array
+	promises = [];
+
+	for (let i = 0; i < results.length; i++) {
+		promises.push(processListing(results[i], posts));
+	}
+
+	await Promise.all(promises);
 
 	//map categories
 	console.log('🚀   Mapping category names');
@@ -139,7 +146,7 @@ const startScrape = async (mode, posts) => {
 };
 
 module.exports = {
-    startScrape: async (mode, posts) => {
-        await startScrape(mode, posts);
-    }
-}
+	startScrape: async (mode, posts) => {
+		await startScrape(mode, posts);
+	},
+};
