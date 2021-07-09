@@ -10,12 +10,10 @@ const processListing = async (searchResp, posts) => {
 	const breadcrumbs = $('.breadcrumbs__separator', bodys);
 	const price = $('.user-ad-price__price', bodys);
 	const profile = $('.seller-profile', bodys);
-	const profileUrl = `https://www.gumtree.com.au${profile[0].attribs.href}`;
+	let profileUrl = '';
 
-	if (profileUrl === undefined) {
-		console.log(profile);
-		console.log(searchResp.url);
-	}
+	profile[0] === undefined ? profileUrl = 'Cant find' : profileUrl = `https://www.gumtree.com.au${profile[0].attribs.href}`
+	
 	const number = $('.reveal-phone-number', bodys);
 	let hasNumber;
 
