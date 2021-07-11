@@ -27,18 +27,18 @@ const recursiveAsyncReadEmail = () => {
 			const transporter = nodemailer.createTransport({
 				service: 'hotmail',
 				auth: {
-					user: 'notabot419@outlook.com',
-					pass: 'imabot1!',
+					user: 'melreece23@outlook.com',
+					pass: 'mel232323!!',
 				},
 			});
 
 			const mailOptions = {
-				from: 'notabot419@outlook.com',
+				from: 'melreece23@outlook.com',
 				to: input,
 				subject: 'Data scraped using gum scraper',
 				attachments: [
 					{
-						filename: 'raw.csv',
+						filename: 'data.csv',
 						content: stream,
 					},
 				],
